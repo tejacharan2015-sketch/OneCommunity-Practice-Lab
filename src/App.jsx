@@ -22,9 +22,80 @@ function App() {
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
   const [newUnit, setNewUnit] = useState('')
+  // Notification and profile dropdown states
+const [showNotifications, setShowNotifications] = useState(false)
+const [showProfile, setShowProfile] = useState(false)
+const [notificationsRead, setNotificationsRead] = useState(false)
+const defaultSettings = {
+  communityName: 'Commonspace Residences',
+  address: '',
+  contactEmail: '',
+  contactPhone: '',
+  adminName: 'Anup Begari',
+  adminEmail: '',
+  residentAlerts: true,
+  requestAlerts: true,
+  visitorAlerts: true,
+  theme: 'light'
+}
+
+const [workspaceSettings, setWorkspaceSettings] = useState(() => {
+  try {
+    return {
+      ...defaultSettings,
+      ...JSON.parse(
+        localStorage.getItem('onecommunity-workspace-settings') || '{}'
+      )
+    }
+  } catch {
+    return defaultSettings
+  }
+})
+
+const [settingsSaved, setSettingsSaved] = useState(false)
+
+function updateSetting(key, value) {
+  setWorkspaceSettings(current => ({
+    ...current,
+    [key]: value
+  }))
+  setSettingsSaved(false)
+}
+
+function saveWorkspaceSettings(event) {
+  event.preventDefault()
+
+  localStorage.setItem(
+    'onecommunity-workspace-settings',
+    JSON.stringify(workspaceSettings)
+  )
+
+  setSettingsSaved(true)
+}
+
+useEffect(() => {
+  document.documentElement.dataset.theme = workspaceSettings.theme
+}, [workspaceSettings.theme])
 
   const pendingCount = residents.filter(r => r.status === 'Pending').length
   const openCount = requests.filter(r => r.status !== 'Resolved').length
+  const notificationItems = [
+  ...residents
+    .filter(r => r.status === 'Pending')
+    .map(r => ({
+      id: `resident-${r.id}`,
+      title: 'New resident approval',
+      detail: `${r.name} · Unit ${r.unit}`
+    })),
+
+  ...requests
+    .filter(r => r.status !== 'Resolved')
+    .map(r => ({
+      id: `request-${r.id}`,
+      title: 'Community request',
+      detail: `${r.title} · ${r.status}`
+    }))
+]
 
   const filteredResidents = useMemo(() => residents.filter(r => {
     const matchesQuery = `${r.name} ${r.unit} ${r.email}`.toLowerCase().includes(query.toLowerCase())
@@ -98,13 +169,271 @@ if (page === 'Residents') {
   )
 }
 
-    if (page === 'Requests') return <section className="panel table-panel">
-      <div className="panel-heading"><div><p className="eyebrow">SERVICE DESK</p><h2>Community requests</h2><p className="muted">Track issues and keep residents updated.</p></div><span className="count-pill">{openCount} open</span></div>
-      <div className="request-list">{requests.map(item => <div className="request-row" key={item.id}><div className="request-icon">▤</div><div className="request-main"><div className="request-title">{item.title}</div><div className="muted small">{item.resident} · {item.unit} · {item.date}</div></div><span className={`priority ${item.priority.toLowerCase()}`}>{item.priority}</span><span className={`status ${item.status.toLowerCase().replace(' ', '-')}`}>{item.status}</span><button className="text-btn" onClick={() => changeRequestStatus(item.id)}>{item.status === 'Resolved' ? 'Reopen' : 'Update'}</button></div>)}</div>
-    </section>
+    if (page === 'Requests') return (
+      <section className="panel table-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">SERVICE DESK</p>
+            <h2>Community requests</h2>
+            <p className="muted">Track issues and keep residents updated.</p>
+          </div>
+          <span className="count-pill">{openCount} open</span>
+        </div>
+
+        <div className="request-list">
+          {requests.map(item => (
+            <div className="request-row" key={item.id}>
+              <div className="request-icon">▤</div>
+              <div className="request-main">
+                <div className="request-title">{item.title}</div>
+                <div className="muted small">
+                  {item.resident} · {item.unit} · {item.date}
+                </div>
+              </div>
+              <span className={`priority ${item.priority.toLowerCase()}`}>
+                {item.priority}
+              </span>
+              <span className={`status ${item.status.toLowerCase().replace(' ', '-')}`}>
+                {item.status}
+              </span>
+              <button
+                className="text-btn"
+                onClick={() => changeRequestStatus(item.id)}
+              >
+                {item.status === 'Resolved' ? 'Reopen' : 'Update'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+    )
 
     if (page === 'Announcements') return <section className="panel empty-panel"><div className="empty-icon">◉</div><h2>Announcements</h2><p className="muted">Your community updates will appear here.</p><button className="primary-btn" onClick={() => alert('Announcement composer is coming soon.')}>＋ New announcement</button></section>
-    if (page === 'Settings') return <section className="panel empty-panel"><div className="empty-icon">⚙</div><h2>Workspace settings</h2><p className="muted">Manage your community profile and preferences.</p><div className="settings-card"><span>Community name</span><strong>Commonspace Residences</strong></div><div className="settings-card"><span>Workspace plan</span><strong>Starter · Practice environment</strong></div></section>
+if (page === 'Settings') return (
+  <div className="settings-page">
+
+    <div className="settings-intro">
+      <div>
+        <p className="eyebrow">WORKSPACE CONFIGURATION</p>
+        <h2>Settings</h2>
+        <p className="muted">
+          Manage your community, administrator profile and preferences.
+        </p>
+      </div>
+      <span className="settings-plan-badge">STARTER PLAN</span>
+    </div>
+
+    <form onSubmit={saveWorkspaceSettings}>
+
+      {/* COMMUNITY PROFILE */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <span className="settings-section-icon">⌂</span>
+          <div>
+            <h3>Community Profile</h3>
+            <p>Basic information about your residential community.</p>
+          </div>
+        </div>
+
+        <div className="settings-form-grid">
+          <label>
+            Community Name
+            <input
+              value={workspaceSettings.communityName}
+              onChange={e => updateSetting('communityName', e.target.value)}
+              required
+            />
+          </label>
+
+          <label>
+            Contact Email
+            <input
+              type="email"
+              value={workspaceSettings.contactEmail}
+              onChange={e => updateSetting('contactEmail', e.target.value)}
+              placeholder="office@example.com"
+            />
+          </label>
+
+          <label>
+            Contact Phone
+            <input
+              type="tel"
+              value={workspaceSettings.contactPhone}
+              onChange={e => updateSetting('contactPhone', e.target.value)}
+            />
+          </label>
+
+          <label className="settings-full">
+            Community Address
+            <textarea
+              rows="2"
+              value={workspaceSettings.address}
+              onChange={e => updateSetting('address', e.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      {/* ADMIN PROFILE */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <span className="settings-section-icon">♙</span>
+          <div>
+            <h3>Administrator Profile</h3>
+            <p>Manage administrator information.</p>
+          </div>
+        </div>
+
+        <div className="settings-form-grid">
+          <label>
+            Administrator Name
+            <input
+              value={workspaceSettings.adminName}
+              onChange={e => updateSetting('adminName', e.target.value)}
+              required
+            />
+          </label>
+
+          <label>
+            Administrator Email
+            <input
+              type="email"
+              value={workspaceSettings.adminEmail}
+              onChange={e => updateSetting('adminEmail', e.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      {/* NOTIFICATIONS */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <span className="settings-section-icon">♧</span>
+          <div>
+            <h3>Notification Preferences</h3>
+            <p>Choose which notifications you want to receive.</p>
+          </div>
+        </div>
+
+        <div className="settings-toggle-list">
+          {[
+            ['residentAlerts', 'Resident Applications', 'Alerts for new resident applications.'],
+            ['requestAlerts', 'Maintenance Requests', 'Alerts for new community requests.'],
+            ['visitorAlerts', 'Visitor Activity', 'Alerts related to visitor activity.']
+          ].map(([key, title, description]) => (
+            <label className="settings-toggle" key={key}>
+              <span>
+                <strong>{title}</strong>
+                <small>{description}</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={workspaceSettings[key]}
+                onChange={e => updateSetting(key, e.target.checked)}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {/* APPEARANCE */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <span className="settings-section-icon">◐</span>
+          <div>
+            <h3>Appearance</h3>
+            <p>Customize your workspace appearance.</p>
+          </div>
+        </div>
+
+        <div className="settings-theme-options">
+          {['light', 'dark'].map(theme => (
+            <label
+              key={theme}
+              className={
+                workspaceSettings.theme === theme
+                  ? 'theme-choice active'
+                  : 'theme-choice'
+              }
+            >
+              <input
+                type="radio"
+                name="theme"
+                checked={workspaceSettings.theme === theme}
+                onChange={() => updateSetting('theme', theme)}
+              />
+              <span>{theme === 'light' ? '☀' : '☾'}</span>
+              <strong>{theme === 'light' ? 'Light Mode' : 'Dark Mode'}</strong>
+              <small>{theme === 'light' ? 'Bright workspace' : 'Low-light workspace'}</small>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {/* WORKSPACE INFORMATION */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <span className="settings-section-icon">▣</span>
+          <div>
+            <h3>Workspace Information</h3>
+            <p>Current workspace details.</p>
+          </div>
+        </div>
+
+        <div className="settings-info-row">
+          <span>Workspace Plan</span>
+          <strong>Starter · Practice Environment</strong>
+        </div>
+
+        <div className="settings-info-row">
+          <span>Platform</span>
+          <strong>OneCommunity OS</strong>
+        </div>
+
+        <div className="settings-info-row">
+          <span>Storage</span>
+          <strong>Browser Local Storage</strong>
+        </div>
+      </section>
+
+      {/* SECURITY */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <span className="settings-section-icon">♢</span>
+          <div>
+            <h3>Security</h3>
+            <p>Account and sign-in information.</p>
+          </div>
+        </div>
+
+        <div className="settings-info-row">
+          <span>Authentication</span>
+          <strong>Not connected</strong>
+        </div>
+
+        <div className="settings-security-note">
+          Password changes and multi-factor authentication require
+          Firebase Authentication integration.
+        </div>
+      </section>
+
+      {/* SAVE */}
+      <div className="settings-actions">
+        <span className="settings-saved-message">
+          {settingsSaved
+            ? '✓ Settings saved successfully'
+            : 'Save your changes to update preferences.'}
+        </span>
+
+        <button className="primary-btn" type="submit">
+          Save Changes
+        </button>
+      </div>
+
+    </form>
+  </div>
+)
 
     return <><section className="welcome"><div><p className="eyebrow light">FRIDAY, 27 NOVEMBER 2026</p><h1>Your community,<br/>running smoothly.</h1><p className="welcome-sub">Here’s what’s happening across Commonspace today.</p></div><div className="welcome-art"><div className="sun"></div><div className="building b1"></div><div className="building b2"></div><div className="building b3"></div><div className="plant">✳</div></div></section>
       <section className="stats-grid">
@@ -119,7 +448,129 @@ if (page === 'Residents') {
   }
 
   return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark"><span></span><span></span><span></span></div><div><strong>commonspace</strong><small>COMMUNITY OS</small></div></div><div className="workspace"><div className="workspace-avatar">CR</div><div><strong>Commonspace Residences</strong><small>Admin workspace</small></div><span>⌄</span></div><p className="nav-label">WORKSPACE</p><nav>{navItems.map(([name, icon]) => <button key={name} className={`nav-item ${page === name ? 'selected' : ''}`} onClick={() => setPage(name)}><span className="nav-icon">{icon}</span>{name}{name === 'Requests' && <i>{openCount}</i>}</button>)}</nav><div className="sidebar-bottom"><div className="help-card"><div className="help-symbol">✦</div><strong>Need a hand?</strong><p>Explore the practice guide and level up your workflow.</p><button onClick={() => alert('Practice guide: complete the tasks in README.md')}>Open practice guide ↗</button></div><div className="profile"><div className="profile-avatar">AB</div><div><strong>Anup Begari</strong><small>Community admin</small></div><span>•••</span></div></div></aside>
-    <main className="main-area"><header className="topbar"><div className="breadcrumb">Workspace <span>/</span> <strong>{page}</strong></div><div className="top-actions"><div className="top-search">⌕ <input placeholder="Search anything..." value={query} onChange={e => setQuery(e.target.value)} /></div><button className="icon-btn" aria-label="Notifications">♧<b></b></button><div className="top-avatar">AB</div></div></header><div className="content">{renderContent()}<footer>© 2026 Commonspace <span>Practice environment · Sample data only</span></footer></div></main>
+    <main className="main-area">
+      <header className="topbar">
+        <div className="breadcrumb">
+          Workspace <span>/</span> <strong>{page}</strong>
+        </div>
+
+        <div className="top-actions">
+          <div className="top-search">
+            ⌕
+            <input
+              placeholder="Search anything..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+
+          {/* NOTIFICATIONS */}
+          <div className="dropdown-container">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Notifications"
+              aria-expanded={showNotifications}
+              onClick={() => {
+                setShowNotifications(value => !value)
+                setShowProfile(false)
+              }}
+            >
+              ♧
+              {notificationItems.length > 0 && !notificationsRead && <b />}
+            </button>
+
+            {showNotifications && (
+              <div className="dropdown-panel">
+                <div className="dropdown-heading">
+                  <h3>Notifications</h3>
+                  <button
+                    type="button"
+                    onClick={() => setNotificationsRead(true)}
+                  >
+                    Mark all read
+                  </button>
+                </div>
+
+                {notificationItems.length === 0 ? (
+                  <p className="dropdown-empty">You're all caught up!</p>
+                ) : (
+                  notificationItems.map(item => (
+                    <div className="notification-item" key={item.id}>
+                      <strong>{item.title}</strong>
+                      <p>{item.detail}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* PROFILE MENU */}
+          <div className="dropdown-container">
+            <button
+              type="button"
+              className="top-avatar"
+              aria-label="Open profile menu"
+              aria-expanded={showProfile}
+              onClick={() => {
+                setShowProfile(value => !value)
+                setShowNotifications(false)
+              }}
+            >
+              AB
+            </button>
+
+            {showProfile && (
+              <div className="dropdown-panel profile-dropdown">
+                <div className="profile-dropdown-heading">
+                  <strong>Anup Begari</strong>
+                  <small>Community Admin</small>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPage('Settings')
+                    setShowProfile(false)
+                  }}
+                >
+                  My Profile
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPage('Settings')
+                    setShowProfile(false)
+                  }}
+                >
+                  Account Settings
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert('Logout is not connected to authentication yet.')
+                    setShowProfile(false)
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="content">
+        {renderContent()}
+        <footer>
+          © 2026 Commonspace
+          <span>Practice environment · Sample data only</span>
+        </footer>
+      </div>
+    </main>
     {showAdd && <div className="modal-backdrop" onClick={() => setShowAdd(false)}><form className="modal" onSubmit={addResident} onClick={e => e.stopPropagation()}><button type="button" className="close-btn" onClick={() => setShowAdd(false)}>×</button><p className="eyebrow">RESIDENT DIRECTORY</p><h2>Add a resident</h2><p className="muted">Create a resident profile for this community.</p><label>Full name<input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Riya Kapoor"/></label><label>Unit number<input value={newUnit} onChange={e => setNewUnit(e.target.value)} placeholder="e.g. A-305"/></label><div className="modal-actions"><button type="button" className="secondary-btn" onClick={() => setShowAdd(false)}>Cancel</button><button className="primary-btn" type="submit">Add resident</button></div></form></div>}
   </div>
 }
