@@ -1,8 +1,15 @@
 import React, { useMemo, useState } from 'react'
 import { initialResidents, initialRequests, activities } from './data'
+import { QRCodeSVG } from 'qrcode.react'
+
 
 const navItems = [
-  ['Overview', '⌂'], ['Residents', '♙'], ['Requests', '▤'], ['Announcements', '◉'], ['Settings', '⚙']
+  ['Overview', '⌂'],
+  ['Residents', '♙'],
+  ['Requests', '▤'],
+  ['Announcements', '◉'],
+  ['Gate Scanner', '▣'],
+  ['Settings', '⚙']
 ]
 
 function App() {
@@ -38,11 +45,9 @@ function App() {
   }
 
   function renderContent() {
-    if (page === 'Residents') return <section className="panel table-panel">
-      <div className="panel-heading"><div><p className="eyebrow">DIRECTORY</p><h2>Residents</h2><p className="muted">Manage the people in your community.</p></div><button className="primary-btn" onClick={() => setShowAdd(true)}>＋ Add resident</button></div>
-      <div className="toolbar"><div className="searchbox"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name, unit or email..." /></div><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option>All statuses</option><option>Active</option><option>Pending</option><option>Inactive</option></select></div>
-      <ResidentsTable residents={filteredResidents} />
-    </section>
+     if (page === 'Gate Scanner') {
+  return <VisitorPassGenerator />
+}
 
     if (page === 'Requests') return <section className="panel table-panel">
       <div className="panel-heading"><div><p className="eyebrow">SERVICE DESK</p><h2>Community requests</h2><p className="muted">Track issues and keep residents updated.</p></div><span className="count-pill">{openCount} open</span></div>
@@ -112,6 +117,103 @@ function ResidentsTable({ residents, compact = false }) {
         </tbody>
       </table>
     </div>
+  )
+}
+
+
+function VisitorPassGenerator() {
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [unit, setUnit] = useState('')
+  const [visitDate, setVisitDate] = useState('')
+  const [visitorQR, setVisitorQR] = useState('')
+
+  function generatePass(event) {
+    event.preventDefault()
+
+    if (!name.trim() || !phone.trim() || !unit.trim() || !visitDate) {
+      alert('Please fill all visitor details')
+      return
+    }
+
+    const uniqueToken =
+      'VIS-' + Date.now() + '-' +
+      Math.random().toString(36).slice(2, 10)
+
+    setVisitorQR(uniqueToken)
+  }
+
+  return (
+    <section className="panel">
+      <h2>Visitor Pass Generator</h2>
+      <p className="muted">
+        Register visitors and generate their QR passes.
+      </p>
+
+      <form onSubmit={generatePass}>
+        <div className="form-group">
+          <label>Visitor Name</label>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Enter visitor name"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Mobile Number</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            placeholder="Enter mobile number"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Flat / Unit Number</label>
+          <input
+            value={unit}
+            onChange={e => setUnit(e.target.value)}
+            placeholder="Enter flat number"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Visit Date</label>
+          <input
+            type="date"
+            value={visitDate}
+            onChange={e => setVisitDate(e.target.value)}
+            required
+          />
+        </div>
+
+        <button type="submit" className="primary-btn">
+          Generate Visitor QR
+        </button>
+      </form>
+
+      {visitorQR && (
+        <div className="visitor-qr">
+          <h3>Visitor Pass Generated</h3>
+
+          <QRCodeSVG
+            value={visitorQR}
+            size={200}
+            level="H"
+          />
+
+          <p><strong>Name:</strong> {name}</p>
+          <p><strong>Unit:</strong> {unit}</p>
+          <p><strong>Visit Date:</strong> {visitDate}</p>
+          <p><strong>Pass ID:</strong> {visitorQR}</p>
+        </div>
+      )}
+    </section>
   )
 }
 
