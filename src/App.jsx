@@ -254,7 +254,7 @@ function VisitorPassGenerator() {
   }
 
   return (
-    <section className="panel">
+    <section className="panel visitor-pass-panel">
 
       {/* VISITOR PASS GENERATOR */}
 
