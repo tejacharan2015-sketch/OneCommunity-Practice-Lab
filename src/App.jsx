@@ -49,6 +49,54 @@ function App() {
      if (page === 'Gate Scanner') {
   return <VisitorPassGenerator />
 }
+// RESIDENTS PAGE
+if (page === 'Residents') {
+  return (
+    <section className="panel table-panel">
+
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">PEOPLE</p>
+          <h2>Resident Directory</h2>
+          <p className="muted">
+            Manage and view all community residents.
+          </p>
+        </div>
+
+        <button
+          className="primary-btn"
+          onClick={() => setShowAdd(true)}
+        >
+          + Add Resident
+        </button>
+      </div>
+
+      <div className="toolbar">
+        <div className="searchbox">
+          ⌕
+          <input
+            placeholder="Search residents..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+        </div>
+
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+        >
+          <option>All statuses</option>
+          <option>Active</option>
+          <option>Pending</option>
+          <option>Inactive</option>
+        </select>
+      </div>
+
+      <ResidentsTable residents={filteredResidents} />
+
+    </section>
+  )
+}
 
     if (page === 'Requests') return <section className="panel table-panel">
       <div className="panel-heading"><div><p className="eyebrow">SERVICE DESK</p><h2>Community requests</h2><p className="muted">Track issues and keep residents updated.</p></div><span className="count-pill">{openCount} open</span></div>
