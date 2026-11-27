@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import { Html5QrcodeScanner } from 'html5-qrcode'
 import { initialResidents, initialRequests, activities } from './data'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -128,6 +129,11 @@ function VisitorPassGenerator() {
   const [visitDate, setVisitDate] = useState('')
   const [visitorQR, setVisitorQR] = useState('')
 
+  const [visitors, setVisitors] = useState([])
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scanResult, setScanResult] = useState(null)
+
+  // Generate visitor QR
   function generatePass(event) {
     event.preventDefault()
 
@@ -140,17 +146,126 @@ function VisitorPassGenerator() {
       'VIS-' + Date.now() + '-' +
       Math.random().toString(36).slice(2, 10)
 
+    const visitor = {
+      id: uniqueToken,
+      name,
+      phone,
+      unit,
+      visitDate,
+      entered: false
+    }
+
+    setVisitors(prev => [...prev, visitor])
     setVisitorQR(uniqueToken)
+  }
+
+  // QR scanner
+  useEffect(() => {
+    if (!scannerOpen) return
+
+    let scanner
+
+    const timer = setTimeout(() => {
+      scanner = new Html5QrcodeScanner(
+        'visitor-qr-reader',
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 }
+        },
+        false
+      )
+
+      scanner.render(
+        (decodedText) => {
+          const visitor = visitors.find(
+            item => item.id === decodedText
+          )
+
+          if (!visitor) {
+            setScanResult({
+              status: 'Invalid',
+              message: 'Visitor pass not found.',
+              visitor: null
+            })
+          } else {
+            const today = [
+              new Date().getFullYear(),
+              String(new Date().getMonth() + 1).padStart(2, '0'),
+              String(new Date().getDate()).padStart(2, '0')
+            ].join('-')
+
+            if (visitor.visitDate < today) {
+              setScanResult({
+                status: 'Expired',
+                message: 'Visitor pass has expired.',
+                visitor
+              })
+            } else if (visitor.entered) {
+              setScanResult({
+                status: 'Already Entered',
+                message: 'This visitor has already checked in.',
+                visitor
+              })
+            } else {
+              setScanResult({
+                status: 'Valid',
+                message: 'Visitor pass verified successfully.',
+                visitor
+              })
+            }
+          }
+
+          setScannerOpen(false)
+        },
+        () => {}
+      )
+    }, 100)
+
+    return () => {
+      clearTimeout(timer)
+
+      if (scanner) {
+        scanner.clear().catch(console.error)
+      }
+    }
+  }, [scannerOpen, visitors])
+
+  // Approve visitor entry
+  function approveEntry() {
+    if (!scanResult?.visitor || scanResult.status !== 'Valid') return
+
+    setVisitors(prev =>
+      prev.map(visitor =>
+        visitor.id === scanResult.visitor.id
+          ? { ...visitor, entered: true }
+          : visitor
+      )
+    )
+
+    setScanResult(prev => ({
+      ...prev,
+      status: 'Entered',
+      message: 'Visitor entry successfully recorded.',
+      visitor: {
+        ...prev.visitor,
+        entered: true
+      }
+    }))
   }
 
   return (
     <section className="panel">
+
+      {/* VISITOR PASS GENERATOR */}
+
       <h2>Visitor Pass Generator</h2>
+
       <p className="muted">
         Register visitors and generate their QR passes.
       </p>
 
       <form onSubmit={generatePass}>
+
         <div className="form-group">
           <label>Visitor Name</label>
           <input
@@ -195,10 +310,14 @@ function VisitorPassGenerator() {
         <button type="submit" className="primary-btn">
           Generate Visitor QR
         </button>
+
       </form>
+
+      {/* GENERATED QR */}
 
       {visitorQR && (
         <div className="visitor-qr">
+
           <h3>Visitor Pass Generated</h3>
 
           <QRCodeSVG
@@ -208,13 +327,165 @@ function VisitorPassGenerator() {
           />
 
           <p><strong>Name:</strong> {name}</p>
+          <p><strong>Mobile:</strong> {phone}</p>
           <p><strong>Unit:</strong> {unit}</p>
           <p><strong>Visit Date:</strong> {visitDate}</p>
           <p><strong>Pass ID:</strong> {visitorQR}</p>
+
         </div>
       )}
+
+      <hr style={{ margin: '30px 0' }} />
+
+      {/* QR SCANNER */}
+
+      <h2>Visitor QR Scanner</h2>
+
+      <p className="muted">
+        Scan visitor passes at the security gate.
+      </p>
+
+      {!scannerOpen && (
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => {
+            setScanResult(null)
+            setScannerOpen(true)
+          }}
+        >
+          📷 Start QR Scanner
+        </button>
+      )}
+
+      {scannerOpen && (
+        <div style={{ marginTop: '20px' }}>
+
+          <div
+            id="visitor-qr-reader"
+            style={{ maxWidth: '450px' }}
+          />
+
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => setScannerOpen(false)}
+          >
+            Stop Scanner
+          </button>
+
+        </div>
+      )}
+
+      {/* VERIFICATION RESULT */}
+
+      {scanResult && (
+        <div
+          style={{
+            marginTop: '25px',
+            padding: '20px',
+            borderRadius: '12px',
+            background:
+              scanResult.status === 'Valid'
+                ? '#dcfce7'
+                : scanResult.status === 'Entered'
+                ? '#dbeafe'
+                : '#fee2e2'
+          }}
+        >
+
+          <h3>
+            Verification: {scanResult.status}
+          </h3>
+
+          <p>{scanResult.message}</p>
+
+          {scanResult.visitor && (
+            <>
+              <p><strong>Name:</strong> {scanResult.visitor.name}</p>
+              <p><strong>Mobile:</strong> {scanResult.visitor.phone}</p>
+              <p><strong>Flat:</strong> {scanResult.visitor.unit}</p>
+              <p><strong>Visit Date:</strong> {scanResult.visitor.visitDate}</p>
+              <p>
+                <strong>Entry Status:</strong>{' '}
+                {scanResult.visitor.entered ? 'Entered' : 'Not Entered'}
+              </p>
+            </>
+          )}
+
+          {scanResult.status === 'Valid' && (
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={approveEntry}
+            >
+              Approve Visitor Entry
+            </button>
+          )}
+
+          <br />
+
+          <button
+            type="button"
+            className="secondary-btn"
+            style={{ marginTop: '15px' }}
+            onClick={() => setScanResult(null)}
+          >
+            Scan Another Visitor
+          </button>
+
+        </div>
+      )}
+
+      {/* VISITOR RECORDS */}
+
+      <div style={{ marginTop: '35px' }}>
+
+        <h3>Visitor Records</h3>
+
+        {visitors.length === 0 ? (
+          <p className="muted">
+            No visitor records available.
+          </p>
+        ) : (
+
+          <div className="table-wrap">
+
+            <table>
+
+              <thead>
+                <tr>
+                  <th>VISITOR</th>
+                  <th>MOBILE</th>
+                  <th>UNIT</th>
+                  <th>VISIT DATE</th>
+                  <th>ENTRY STATUS</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {visitors.map(visitor => (
+                  <tr key={visitor.id}>
+                    <td>{visitor.name}</td>
+                    <td>{visitor.phone}</td>
+                    <td>{visitor.unit}</td>
+                    <td>{visitor.visitDate}</td>
+                    <td>
+                      {visitor.entered ? 'Entered' : 'Not Entered'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+
+            </table>
+
+          </div>
+
+        )}
+
+      </div>
+
     </section>
   )
 }
-
 export default App
