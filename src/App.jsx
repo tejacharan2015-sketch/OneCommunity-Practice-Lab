@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { initialResidents, initialRequests, activities } from './data'
 import { QRCodeSVG } from 'qrcode.react'
 
 
 const navItems = [
   ['Overview', '⌂'],
+
   ['Residents', '♙'],
   ['Requests', '▤'],
   ['Announcements', '◉'],
